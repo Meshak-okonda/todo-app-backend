@@ -34,8 +34,6 @@ provider:
     lambda: true
     apiGateway: true
 
-  # Use these variables in the functions and resouorces section below. For example, 
-  # ${self:provider.environment.ATTACHMENT_S3_BUCKET}
   environment:
     AUTH_0_SECRET_ID: "MIIDDTCCAfWgAwIBAgIJZVQwHYHA6k+DMA0GCSqGSIb3DQEBCwUAMCQxIjAgBgNV
 BAMTGWRldi1vYW4wMnVvNC51cy5hdXRoMC5jb20wHhcNMjIxMDEyMTAzNjA0WhcN
@@ -62,22 +60,21 @@ lZS0VR4Ird1uCot+unqlaYk="
 
   logs:
     restApi: true
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action: '*'
-          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
-        - Effect: Allow
-          Action:
-            - xray:PutTelemetryRecords
-            - xray:PutTraceSegments
-          Resource: "*"
-        - Effect: Allow
-          Action: 
-            - s3:PutObject
-            - s3:GetObject
-          Resource: arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action: '*'
+      Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+    - Effect: Allow
+      Action:
+        - xray:PutTelemetryRecords
+        - xray:PutTraceSegments
+      Resource: "*"
+    - Effect: Allow
+      Action: 
+        - s3:PutObject
+        - s3:GetObject
+      Resource: arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*
 
 
 functions:
@@ -171,7 +168,7 @@ resources:
               ProjectionType: ALL
 
 
-    AttanchmentsBucket:
+    AttachmentsBucket:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:provider.environment.ATTACHMENT_S3_BUCKET}
@@ -188,16 +185,16 @@ resources:
               AllowedHeaders:
                 - '*'
               MaxAge: 3000
-
     BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
-        Bucket: !Ref AttanchmentsBucket
-        PolicyDocument:
+        Bucket: !Ref AttachmentsBucket
+        PolicyDocument: 
           Id: MyPolicy
           Version: "2012-10-17"
           Statement:
-            - Effect: Allow
+            - Sid: PublicReadForGetBucketObjects
+              Effect: Allow
               Principal: '*'
               Action: 's3:GetObject'
-              Ressource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*'
+              Resource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*'

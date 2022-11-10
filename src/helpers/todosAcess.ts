@@ -1,25 +1,12 @@
 import { createLogger } from '../utils/logger';
-// import { TodoItem } from '../models/TodoItem';
 import { TodoUpdate } from '../models/TodoUpdate';
 import * as AWS from 'aws-sdk';
 import { TodoItem } from '../models/TodoItem';
-// const AWSXray = require('aws-xray-sdk');
-const logger = createLogger('TodosAccess')
+import * as AWSXray from "aws-xray-sdk";
+const logger = createLogger('TodosAccess');
 
-
-// const XAWS = AWSXray.captureAWS(AWS)
-const docClient = new AWS.DynamoDB.DocumentClient({
-  region: 'localhost',
-  endpoint: 'http://localhost:8000',
-  accessKeyId: 'AKIAV44PTHGPARSR2AAU',  // needed if you don't have aws credentials at all in env
-  secretAccessKey: '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' // needed if you don't have aws credentials at all in env
-});
-
-
-// const XAWS = AWSXray.captureAWS(AWS)
-// const docClient = new XAWS.DynamoDB.DocumentClient();
-
-
+const XAWS = AWSXray.captureAWS(AWS);
+const docClient = new XAWS.DynamoDB.DocumentClient({});
 
 
 const TODO_TABLE = process.env.TODOS_TABLE;
