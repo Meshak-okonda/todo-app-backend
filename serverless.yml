@@ -1,0 +1,203 @@
+org: meshak
+app: todo-app
+service: todo-app
+
+frameworkVersion: '3'
+
+custom:
+  serverless-offline:
+    httpPort: 4000
+  dynamodb:
+  # If you only want to use DynamoDB Local in some stages, declare them here
+    stages:
+      - ${self:provider.stage}
+    start:
+      port: 8000
+      inMemory: true
+      convertEmptyValues: true
+      migrate: true
+
+plugins:
+  - serverless-webpack
+  - serverless-iam-roles-per-function
+  - serverless-plugin-tracing
+  - serverless-offline
+  - serverless-dynamodb-local
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+
+  tracing:
+    lambda: true
+    apiGateway: true
+
+  # Use these variables in the functions and resouorces section below. For example, 
+  # ${self:provider.environment.ATTACHMENT_S3_BUCKET}
+  environment:
+    AUTH_0_SECRET_ID: "MIIDDTCCAfWgAwIBAgIJZVQwHYHA6k+DMA0GCSqGSIb3DQEBCwUAMCQxIjAgBgNV
+BAMTGWRldi1vYW4wMnVvNC51cy5hdXRoMC5jb20wHhcNMjIxMDEyMTAzNjA0WhcN
+MzYwNjIwMTAzNjA0WjAkMSIwIAYDVQQDExlkZXYtb2FuMDJ1bzQudXMuYXV0aDAu
+Y29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwsqybUVwxp0hkN/d
+5c/3xGHiIxoaflX8TcFYp9EbFdU1ECDmtCSdKB9UJYfLWuCUJ3KhRrvimVrKh+yd
+/k09K37NvxENo8Z53hiIg8TX0/+ifL74W6oZOVTdAeTpGG7S28NbLFfam5RXMkgV
+HBQrSOrn6Nd/swzcL3+HU2iOTzWdY2kOSa3MUnApCjzY0WlzDFN0uCXooz1XMe0H
+rx3FByPC8u6LliZaatO4uhqF+089GzQY6SDNebjl1qMjyQoXk2h6zl8OAL6ocF4d
+gwcEwvOUdL88I+Qn9+iEIHqpVdcCqqYDP98359Rl/rhO1Snrv7z3t+Ev42k9D0ar
+bXkf8QIDAQABo0IwQDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRAMD+mo5F7
+Ccw1lZOl5SAwG66RUTAOBgNVHQ8BAf8EBAMCAoQwDQYJKoZIhvcNAQELBQADggEB
+AFXSl5Gra4vwIY2bg99sAZ3a9olMKnIAz2NW0eOazK03sC05JryMagZf1Yu+I4IQ
+a2Pr6yB4yn0yNIxH6LU220dHaov0w2De+JayOf+A1pneScWlcKYlgUC4RmuEApvO
+opMBlAbt1o1RinisPI8vygfheKbfFra1nr6P0be6Ptfmi/PqIdFkwB8nHzZ+O90f
+QDUFvkZo4BXq/x1vpCPS2tPVLA73++fyuHarN1A1qXQyqzGdKSqzwTk+M7UL47ha
+dTPluCaSdRXkoZchMU03ujIprIHRJsoG2NkIUm6LYvtN9Dw1xub3oBvmE5UtValm
+lZS0VR4Ird1uCot+unqlaYk="
+    TODOS_TABLE: Todos-${self:provider.stage}
+    TODOS_CREATED_AT_INDEX: CreatedAtIndex
+    ATTACHMENT_S3_BUCKET: serverless-c4-todo-images-meshak-${self:provider.stage}
+    AUTH_PROVIDER: "dev-oan02uo4.us.auth0.com"
+    SIGNED_URL_EXPIRATION: 300
+
+  logs:
+    restApi: true
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: '*'
+          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+        - Effect: Allow
+          Action:
+            - xray:PutTelemetryRecords
+            - xray:PutTraceSegments
+          Resource: "*"
+        - Effect: Allow
+          Action: 
+            - s3:PutObject
+            - s3:GetObject
+          Resource: arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*
+
+
+functions:
+
+  Auth:
+    handler: src/lambda/auth/auth0Authorizer.handler
+
+  GetTodos:
+    handler: src/lambda/http/getTodos.handler
+    events:
+      - http:
+          method: get
+          path: todos
+          cors: true
+          authorizer: Auth
+    timeout: 20
+
+  # Provide iamRoleStatements property. Decide the Actions and AWS Resource. 
+  # To refer to an AWS resource defined in the "Resources" section, you can use "Resource: !GetAtt <resource-name>.Arn"
+  # To validate incoming HTTP requests, we have provided the request schemas in function definition below. 
+  CreateTodo:
+    handler: src/lambda/http/createTodo.handler
+    timeout: 20
+    events:
+      - http:
+          method: post
+          path: todos
+          cors: true
+          authorizer: Auth
+          request:
+            schemas:
+              application/json: ${file(models/create-todo-model.json)}
+
+  # Provide property for setting up CORS, Authorizer, iamRoleStatements, and request schemas
+
+  UpdateTodo:
+    handler: src/lambda/http/updateTodo.handler
+    timeout: 20
+    events:
+      - http:
+          method: put
+          path: todos/{todoId}
+          cors: true
+          authorizer: Auth
+          request:
+            schemas:
+              application/json: ${file(models/update-todo-model.json)}
+
+  # Provide property for setting up CORS, Authorizer, iamRoleStatements
+  DeleteTodo:
+    handler: src/lambda/http/deleteTodo.handler
+    timeout: 20
+    events:
+      - http:
+          method: delete
+          path: todos/{todoId}
+          cors: true
+          authorizer: Auth
+          
+
+
+  # Provide property for setting up CORS, Authorizer, iamRoleStatements
+  GenerateUploadUrl:
+    handler: src/lambda/http/generateUploadUrl.handler
+    events:
+      - http:
+          method: post
+          path: todos/{todoId}/attachment
+
+resources:
+  Resources:
+    TodosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: todoId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: todoId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:provider.environment.TODOS_TABLE}
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.TODOS_CREATED_AT_INDEX}
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+
+    AttanchmentsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.ATTACHMENT_S3_BUCKET}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - HEAD
+              AllowedOrigins:
+                - '*'
+              AllowedHeaders:
+                - '*'
+              MaxAge: 3000
+
+    BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref AttanchmentsBucket
+        PolicyDocument:
+          Id: MyPolicy
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal: '*'
+              Action: 's3:GetObject'
+              Ressource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*'
